@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd"
+  beStrictAboutTestsThatDoNotTestAnything="false" 
+  convertWarningsToExceptions="true" 
+  convertNoticesToExceptions="true" 
+  convertErrorsToExceptions="true" 
+  backupStaticAttributes="false" 
+  processIsolation="false" 
+  backupGlobals="false" 
+  stopOnFailure="false" 
+  bootstrap="vendor/autoload.php" 
+  colors="true" 
+>
+<coverage processUncoveredFiles="true">
+  <include>
+    <directory suffix=".php">./src</directory>
+  </include>
+</coverage>
+<testsuites>
+  <testsuite name="Package Tests">
+    <directory suffix="Test.php">./tests</directory>
+  </testsuite>
+</testsuites>
+<php>
+  <env name="APP_KEY" value="base64:la8jDWcqBHfGO6PR+OA9FAZqdi0XQKuhnzqc5tUATZs="/>
+  <env name="DB_CONNECTION" value="testing"/>
+</php>
+</phpunit>
