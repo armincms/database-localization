@@ -12,9 +12,9 @@ class ServiceProvider extends TranslationServiceProvider
      * @return void
      */
     public function boot()
-    {   
+    {    
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-        $this->mergeConfigFrom(__DIR__.'/../config/database-localization.php', 'database-localization');
+        $this->mergeConfigFrom(__DIR__.'/../config/database-localization.php', 'database-localization'); 
     }  
 
     /**
@@ -31,5 +31,9 @@ class ServiceProvider extends TranslationServiceProvider
         $this->app->singleton(Store::class, function ($app) {
             return new DatabaseStore($app['db'], $app['cache']);
         });
+
+        $this->commands([
+            Commands\SyncCommand::class,
+        ]);
     }
 }

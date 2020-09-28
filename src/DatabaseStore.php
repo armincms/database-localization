@@ -45,8 +45,16 @@ class DatabaseStore implements Store
      * @return array            
      */
     public function translations(string $locale, string $group = '*', string $namespace = '*') : array
-    { 
-        $results = $this->table()->where(compact('namespace', 'group'))->get();
+    {  
+        $results = $this->table()
+            ->where('namespace', $namespace) 
+            ->when($group == '*', function($query) {
+                $query->whereGroup('*');
+            })
+            ->when($group != '*', function($query) use ($group) { 
+                $query->where('group', 'regexp', $group.".*"); 
+            })
+            ->get(); 
 
         return $this->handleManyResults($results->all(), $locale);
     }
@@ -59,10 +67,16 @@ class DatabaseStore implements Store
      * @return [type]          
      */
     public function handleManyResults(array $results, string $locale): array
-    {
-        return collect($results)->pluck('text', 'key')->map(function($text) use ($locale) {
-            return data_get(json_decode($text, true), $locale);
-        })->toArray();
+    { 
+        return collect($results)
+                ->reduce(function($carry, $result) use ($locale) {  
+                    $value = data_get(json_decode($result->text, true), $locale);
+                    $parts = explode('.', $result->group.'.'.$result->key);
+
+                    array_shift($parts);
+
+                    return (array) data_set($carry, implode('.', $parts), $value);  
+                }, []);
     }
 
     /**
@@ -90,7 +104,12 @@ class DatabaseStore implements Store
     public function putMany(array $values, string $locale, string $group = '*', string $namespace = '*')
     {
         collect($values)->each(function($text, $key) use ($locale, $group, $namespace) {
-            $this->put($key, $text, $locale, $group, $namespace);
+            if(is_array($text)) {
+                // Handles nested translations
+                $this->putMany($text, $locale, "{$group}.{$key}", $namespace);
+            } else {
+                $this->put($key, $text, $locale, $group, $namespace);
+            }
         });
 
         return $this;

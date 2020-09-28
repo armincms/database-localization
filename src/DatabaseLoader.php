@@ -81,8 +81,13 @@ class DatabaseLoader extends FileLoader
         }  
 
         return $this->repository->translations($locale, $group, $namespace);
-    }
+    } 
 
+    /**
+     * Get the repository instance.
+     * 
+     * @return 
+     */
     public function repository()
     {
         return $this->repository;
