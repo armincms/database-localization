@@ -38,8 +38,10 @@ class DatabaseLoader extends FileLoader
      */
     protected function loadJsonPaths($locale)
     {  
-    	if(! $this->repository->has($locale)) {
-    		$this->repository->putMany((array) parent::loadJsonPaths($locale), $locale);
+    	if(! $this->repository->has($this->defaultLocale())) {
+    		$this->repository->putMany(
+                (array) parent::loadJsonPaths($this->defaultLocale()), $this->defaultLocale()
+            );
     	}
 
     	return $this->repository->translations($locale); 
@@ -55,8 +57,10 @@ class DatabaseLoader extends FileLoader
      */
     protected function loadPath($path, $locale, $group)
     {
-        if(! $this->repository->has($locale, $group)) { 
-            $this->repository->putMany((array) parent::loadPath($path, $locale, $group), $locale, $group);
+        if(! $this->repository->has($this->defaultLocale(), $group)) { 
+            $lines = (array) parent::loadPath($path, $this->defaultLocale(), $group);
+
+            $this->repository->putMany($lines, $this->defaultLocale(), $group);
         } 
 
         return $this->repository->translations($locale, $group); 
@@ -72,12 +76,12 @@ class DatabaseLoader extends FileLoader
      */
     protected function loadNamespaced($locale, $group, $namespace)
     {
-        if(! $this->repository->has($locale, $group, $namespace) && isset($this->hints[$namespace])) { 
-            $lines = parent::loadPath($this->hints[$namespace], $locale, $group);
+        if(! $this->repository->has($this->defaultLocale(), $group, $namespace) && isset($this->hints[$namespace])) { 
+            $lines = parent::loadPath($this->hints[$namespace], $this->defaultLocale(), $group);
 
-            $this->repository->putMany(
-                $this->loadNamespaceOverrides($lines, $locale, $group, $namespace), $locale, $group, $namespace
-            );
+            $namespaced = $this->loadNamespaceOverrides($lines, $this->defaultLocale(), $group, $namespace);
+
+            $this->repository->putMany($namespaced, $this->defaultLocale(), $group, $namespace);
         }  
 
         return $this->repository->translations($locale, $group, $namespace);
@@ -91,5 +95,15 @@ class DatabaseLoader extends FileLoader
     public function repository()
     {
         return $this->repository;
+    }
+
+    /**
+     * Get the default locale string.
+     * 
+     * @return string
+     */
+    public function defaultLocale(): string
+    {
+        return config('database-localization.locale', $this->defaultLocale());
     }
 }
