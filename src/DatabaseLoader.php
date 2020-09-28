@@ -104,6 +104,6 @@ class DatabaseLoader extends FileLoader
      */
     public function defaultLocale(): string
     {
-        return config('database-localization.locale', $this->defaultLocale());
+        return config('database-localization.locale', 'en');
     }
 }
