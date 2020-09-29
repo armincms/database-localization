@@ -52,7 +52,7 @@ class DatabaseStore implements Store
                 $query->whereGroup('*');
             })
             ->when($group != '*', function($query) use ($group) { 
-                $query->where('group', 'regexp', $group.".*"); 
+                $query->where('group', 'regexp', preg_quote($group).".*"); 
             })
             ->get(); 
 
