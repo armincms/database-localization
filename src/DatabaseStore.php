@@ -51,8 +51,10 @@ class DatabaseStore implements Store
             ->when($group == '*', function($query) {
                 $query->whereGroup('*');
             })
-            ->when($group != '*', function($query) use ($group) { 
-                $query->where('group', 'regexp', preg_quote($group).".*"); 
+            ->when($group != '*', function($query) use ($group) {   
+                $query
+                    ->where('group', $group) 
+                    ->orWhere('group', 'regexp', preg_quote($group)."\.(.*)"); 
             })
             ->get(); 
 
