@@ -6,7 +6,7 @@ use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Contracts\Cache\Factory; 
 
 
-class DatabaseStore implements Store
+class DatabaseStore implements Store, Cacheable
 { 	
     /**
      * The connection resolver instance.
@@ -45,6 +45,23 @@ class DatabaseStore implements Store
      * @return array            
      */
     public function translations(string $locale, string $group = '*', string $namespace = '*') : array
+    {  
+        $callback = function() use ($locale, $group, $namespace) {
+            return $this->getStringsFromStorage($locale, $namespace, $group);
+        };
+
+        return $this->cache->sear($this->getCacheKey($locale, $group, $namespace), $callback); 
+    }
+
+    /**
+     * Get translation strings from the database for the givan locale, group and namespace.
+     *          
+     * @param  string $locale 
+     * @param  string $group       
+     * @param  string $namespace    
+     * @return array            
+     */
+    public function getStringsFromStorage(string $locale, string $group = '*', string $namespace = '*') : array
     {  
         $results = $this->table()
             ->where('namespace', $namespace) 
@@ -130,7 +147,7 @@ class DatabaseStore implements Store
     public function put(string $key, string $text, string $locale, string $group = '*', string $namespace = '*')
     {
         if($this->has($key, $locale, $group, $namespace)) {
-            $this->update($key, $text, $locale, $group, $namespace);
+            return $this->update($key, $text, $locale, $group, $namespace);
         } 
 
         $this->table()->insert([
@@ -140,7 +157,7 @@ class DatabaseStore implements Store
             'text'  => json_encode([$locale => $text]), 
         ]);
 
-        return $this;
+        return $this->forget($locale, $group, $namespace);
     }
 
     /**
@@ -159,7 +176,7 @@ class DatabaseStore implements Store
             "text->{$locale}"  => $text, 
         ]);
 
-        return $this;
+        return $this->forget($locale, $group, $namespace);
     }  
 
     /**
@@ -184,5 +201,30 @@ class DatabaseStore implements Store
 	public function table()
 	{
 		return $this->connection->table(config('database-localization.database', 'database_localization'));
-	}
+	} 
+
+    /**
+     * Returns cacheKey for the given paramaters.
+     *            
+     * @return bool            
+     */
+    protected function getCacheKey()
+    {
+        return md5(get_called_class().implode('', func_get_args()));
+    }
+
+    /**
+     * Clears cache strings for the given locale, group and namesapce.
+     *          
+     * @param  string $locale 
+     * @param  string $group       
+     * @param  string $namespace 
+     * @return array            
+     */
+    public function forget(string $locale, string $group = '*', string $namespace = '*')
+    {
+        $this->cache->forget($this->getCacheKey($locale, $group, $namespace));
+
+        return $this;
+    }
 }
