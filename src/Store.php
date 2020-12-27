@@ -4,37 +4,35 @@ namespace Armincms\DatabaseLocalization;
 
 
 interface Store
-{ 	
+{ 	  
 	/**
-	 * Get the tranlsation text for the given key.
-	 *        
-	 * @param  string $key    
-	 * @param  string $text 
-	 * @param  string $locale 
-	 * @param  string $group      
-	 * @param  string $namespace 
-	 * @return void            
-	 */
-	public function put(string $key, string $text, string $locale, string $group = '*', string $namespace = '*');
-
-	/**
-	 * Set the translation text for the given key.
-	 *      
-	 * @param  string $key     
-	 * @param  string $locale 
-	 * @param  string $group       
-	 * @param  string $namespace 
-	 * @return string            
-	 */
-	public function get(string $key, string $locale, string $group = '*', string $namespace = '*') : string;
-
-	/**
-	 * Get the translations text for the given key.
+	 * Insert the given strings into the storage.
 	 *          
+	 * @param  array $strings 
 	 * @param  string $locale 
 	 * @param  string $group       
 	 * @param  string $namespace 
 	 * @return array            
 	 */
-	public function translations(string $locale, string $group = '*', string $namespace = '*') : array;
+	public function put(array $strings, string $locale, string $group = '*', string $namespace = '*');
+
+	/**
+	 * Get the strings from the storage.
+	 *           
+	 * @param  string $locale 
+	 * @param  string $group       
+	 * @param  string $namespace 
+	 * @return array            
+	 */
+	public function get(string $locale, string $group = '*', string $namespace = '*'): array;
+
+	/**
+	 * Determine if the strings exists in the storage.
+	 *           
+	 * @param  string $locale 
+	 * @param  string $group       
+	 * @param  string $namespace 
+	 * @return bool            
+	 */
+	public function has(string $locale, string $group = '*', string $namespace = '*'): bool; 
 }
