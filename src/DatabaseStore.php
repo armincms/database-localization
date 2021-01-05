@@ -146,7 +146,7 @@ class DatabaseStore implements Store, Cacheable
      */
     public function put(string $key, string $text, string $locale, string $group = '*', string $namespace = '*')
     {
-        if($this->has($key, $locale, $group, $namespace)) {
+        if($this->table()->where(compact('key', 'group', 'namespace'))->exists()) {
             return $this->update($key, $text, $locale, $group, $namespace);
         } 
 
