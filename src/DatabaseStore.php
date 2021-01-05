@@ -171,10 +171,14 @@ class DatabaseStore implements Store, Cacheable
      * @return void            
      */
     public function update(string $key, string $text, string $locale, string $group = '*', string $namespace = '*')
-    {  
-        $this->table()->where(compact('namespace', 'group', 'key'))->update([
-            "text->{$locale}"  => $text, 
-        ]);
+    {   
+        try {
+            $this->table()->where(compact('namespace', 'group', 'key'))->update([
+                "text->{$locale}"  => $text, 
+            ]); 
+        } catch (\Exception $e) {
+            
+        }
 
         return $this->forget($locale, $group, $namespace);
     }  
