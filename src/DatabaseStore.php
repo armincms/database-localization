@@ -2,25 +2,25 @@
 
 namespace Armincms\DatabaseLocalization;
 
-use Illuminate\Database\ConnectionResolverInterface; 
-use Illuminate\Support\Arr;
+use Illuminate\Database\ConnectionResolverInterface;
+use Illuminate\Contracts\Cache\Factory; 
 
 
-class DatabaseStore implements Store
+class DatabaseStore implements Store, Cacheable
 { 	
     /**
      * The connection resolver instance.
      *
      * @var \Illuminate\Database\ConnectionResolverInterface
      */
-    protected $connection;  
+    protected $connection;
 
     /**
-     * Array of loaded strings.
+     * The cache factory instance.
      *
-     * @var array
+     * @var \Illuminate\Database\ConnectionResolverInterface
      */
-    protected $loaded = []; 
+    protected $cache; 
 
     /**
      * Create a new database store.
@@ -30,193 +30,168 @@ class DatabaseStore implements Store
      * @param  string  $prefix
      * @return void
      */
-    public function __construct(ConnectionResolverInterface $connection)
+    public function __construct(ConnectionResolverInterface $connection, Factory $cache)
     {
-        $this->connection = $connection;   
-    }
+        $this->connection = $connection;  
+        $this->cache = $cache;  
+    } 
 
     /**
-     * Insert the given strings into the storage.
+     * Get the translations text for the given key.
      *          
-     * @param  array $strings 
      * @param  string $locale 
      * @param  string $group       
-     * @param  string $namespace 
+     * @param  string $namespace    
      * @return array            
      */
-    public function put(array $strings, string $locale, string $group = '*', string $namespace = '*')
-    {
-        collect($strings)->each(function($value, $key) use ($locale, $group, $namespace) { 
-            is_array($value) 
-                ? $this->put($value, $locale, "{$group}.{$key}", $namespace)
-                : $this->updateOrCreate($key, $value, $locale, $group, $namespace);
-        });
-
-        return $this;
-    } 
-
-    /**
-     * Create or update a record matching the attributes, and fill it with values.
-     *
-     * @param  string $key       
-     * @param  string $locale    
-     * @param  string $value    
-     * @param  string $group     
-     * @param  string $namespace 
-     * @return $this
-     */
-    public function updateOrCreate(string $key, string $value, string $locale, string $group, string $namespace)
-    {
-        $string = $this->getString($key, $locale, $group, $namespace);
-
-        if(is_null($string)) { 
-            return $this->create($key, $value, $locale, $group, $namespace);
-        } elseif ($string !== $value) {
-            return $this->update($key, $value, $locale, $group, $namespace);
-        }
-
-        return $this;
-    }
-
-    public function getString(string $key, string $locale, string $group, string $namespace)
-    { 
-        return Arr::get($this->get($locale, $group, $namespace), "{$group}.{$key}");
-    } 
-
-    /**
-     * Update the tranlsations text for the given key.
-     *        
-     * @param  string $key    
-     * @param  string $value 
-     * @param  string $locale 
-     * @param  string $group       
-     * @param  string $namespace   
-     * @return void            
-     */
-    public function update(string $key, string $value, string $locale, string $group = '*', string $namespace = '*')
-    {   
-        $this->table()->where(compact('namespace', 'group', 'key', 'locale'))->update(compact('value'));
-
-        return $this->forget($locale, $group, $namespace);
-    }  
-
-    /**
-     * Create the tranlsation text for the given key.
-     *        
-     * @param  string $key    
-     * @param  string $value 
-     * @param  string $locale 
-     * @param  string $group       
-     * @param  string $namespace   
-     * @return void            
-     */
-    public function create(string $key, string $value, string $locale, string $group = '*', string $namespace = '*')
-    {   
-        $this->table()->insert(compact('key', 'value', 'locale', 'group', 'namespace'));
-
-        return $this->forget($locale, $group, $namespace);
-    }
-
-
-    /**
-     * Get the strings from the storage.
-     *           
-     * @param  string $locale 
-     * @param  string $group       
-     * @param  string $namespace 
-     * @return array            
-     */
-    public function get(string $locale, string $group = '*', string $namespace = '*'): array
-    {
-        $this->loadStringsIfNotLoaded($locale, $group, $namespace);
-
-        return (array) data_get($this->loaded, $this->getCacheKey($locale, $group, $namespace), []); 
-    }
-
-    /**
-     * Get the strings from the storage.
-     *           
-     * @param  string $locale 
-     * @param  string $group       
-     * @param  string $namespace 
-     * @return array            
-     */
-    public function loadStringsIfNotLoaded(string $locale, string $group = '*', string $namespace = '*')
+    public function translations(string $locale, string $group = '*', string $namespace = '*') : array
     {  
-        if(empty($this->loaded)) {
-            $start = microtime(true);
-            $this->loaded = $this->table()->get()->groupBy(function($result) {
-                return $this->getCacheKey($result->locale, $result->group, $result->namespace);
-            })->map(function($strings) {
-                return $this->handleManyResults($strings->all());
-            })->all(); 
-        }
-        
-        return $this;
-    }  
+        $callback = function() use ($locale, $group, $namespace) {
+            return $this->getStringsFromStorage($locale, $namespace, $group);
+        };
 
-    /**
-     * Get the strings from the storage.
-     *           
-     * @param  string $locale 
-     * @param  string $group       
-     * @param  string $namespace 
-     * @return array            
-     */
-    public function getLoaded(string $locale, string $group = '*', string $namespace = '*')
-    {
-        return (array) data_get($this->loaded, $this->getCacheKey($locale, $group, $namespace));
+        return $this->cache->sear($this->getCacheKey($locale, $group, $namespace), $callback); 
     }
 
     /**
-     * Get the strings from the storage.
-     *           
+     * Get translation strings from the database for the givan locale, group and namespace.
+     *          
      * @param  string $locale 
      * @param  string $group       
-     * @param  string $namespace 
-     * @return bool            
+     * @param  string $namespace    
+     * @return array            
      */
-    public function stringsLoaded(string $locale, string $group = '*', string $namespace = '*')
-    {
-        return array_key_exists(
-            $this->getCacheKey($locale, $group, $namespace), (array) $this->loaded
-        );
+    public function getStringsFromStorage(string $locale, string $group = '*', string $namespace = '*') : array
+    {  
+        $results = $this->table()
+            ->where('namespace', $namespace) 
+            ->when($group == '*', function($query) {
+                $query->whereGroup('*');
+            })
+            ->when($group != '*', function($query) use ($group) {   
+                $query
+                    ->where('group', $group) 
+                    ->orWhere('group', 'regexp', preg_quote($group)."\.(.*)"); 
+            })
+            ->get(); 
+
+        return $this->handleManyResults($results->all(), $locale);
     }
 
     /**
      * Filter the avialable data with given locale.
      * 
-     * @param  array  $results  
+     * @param  array  $results 
+     * @param  string $locale  
      * @return [type]          
      */
-    public function handleManyResults(array $results): array
+    public function handleManyResults(array $results, string $locale): array
     { 
         return collect($results)
-                ->reduce(function($carry, $result) {   
-                    if($result->group !== '*') {
-                        return (array) data_set($carry, "{$result->group}.{$result->key}", $result->value);  
-                    } 
+                ->reduce(function($carry, $result) use ($locale) {  
+                    $value = data_get(json_decode($result->text, true), $locale);
+                    $parts = explode('.', $result->group.'.'.$result->key);
 
-                    $carry[$result->group][$result->key] = $result->value;
+                    array_shift($parts);
 
-                    return $carry; 
+                    return (array) data_set($carry, implode('.', $parts), $value);  
                 }, []);
     }
 
     /**
-     * Determine if the strings exists in the storage.
-     *           
+     * Check the translations text existence.
+     *          
      * @param  string $locale 
      * @param  string $group       
-     * @param  string $namespace 
+     * @param  string $namespace    
      * @return bool            
      */
-    public function has(string $locale, string $group = '*', string $namespace = '*'): bool
-    { 
-        $this->loadStringsIfNotLoaded($locale, $group, $namespace);  
-
-        return $this->stringsLoaded($locale, $group, $namespace); 
+    public function has(string $locale, string $group = '*', string $namespace = '*') : bool
+    {
+        return ! empty($translations = $this->translations($locale, $group, $namespace));
     } 
+
+    /**
+     * Insert the tranlsations text for the given keys.
+     *        
+     * @param  string $values    
+     * @param  string $locale 
+     * @param  string $group       
+     * @param  string $namespace   
+     * @return void            
+     */
+    public function putMany(array $values, string $locale, string $group = '*', string $namespace = '*')
+    {
+        collect($values)->each(function($text, $key) use ($locale, $group, $namespace) {
+            if(is_array($text)) {
+                // Handles nested translations
+                $this->putMany($text, $locale, "{$group}.{$key}", $namespace);
+            } else {
+                $this->put($key, $text, $locale, $group, $namespace);
+            }
+        });
+
+        return $this;
+    }
+
+    /**
+     * Create the tranlsation text for the given key.
+     *        
+     * @param  string $key    
+     * @param  string $text 
+     * @param  string $locale 
+     * @param  string $group       
+     * @param  string $namespace   
+     * @return void            
+     */
+    public function put(string $key, string $text, string $locale, string $group = '*', string $namespace = '*')
+    {
+        if($this->has($key, $locale, $group, $namespace)) {
+            return $this->update($key, $text, $locale, $group, $namespace);
+        } 
+
+        $this->table()->insert([
+            'namespace' => $namespace,
+            'group' => $group,
+            'key'   => $key, 
+            'text'  => json_encode([$locale => $text]), 
+        ]);
+
+        return $this->forget($locale, $group, $namespace);
+    }
+
+    /**
+     * Update the tranlsations text for the given key.
+     *        
+     * @param  string $key    
+     * @param  string $text 
+     * @param  string $locale 
+     * @param  string $group       
+     * @param  string $namespace   
+     * @return void            
+     */
+    public function update(string $key, string $text, string $locale, string $group = '*', string $namespace = '*')
+    {  
+        $this->table()->where(compact('namespace', 'group', 'key'))->update([
+            "text->{$locale}"  => $text, 
+        ]);
+
+        return $this->forget($locale, $group, $namespace);
+    }  
+
+    /**
+     * Set the translation text for the given key.
+     *      
+     * @param  string $key     
+     * @param  string $locale 
+     * @param  string $group       
+     * @param  string $namespace    
+     * @return string            
+     */
+    public function get(string $key, string $locale, string $group = '*', string $namespace = '*') : string
+    {
+        return data_get($this->tranlsations(), $locale);
+    }  
     
     /**
      * Get a query builder for the localization table.
@@ -226,7 +201,7 @@ class DatabaseStore implements Store
 	public function table()
 	{
 		return $this->connection->table(config('database-localization.database', 'database_localization'));
-	}   
+	} 
 
     /**
      * Returns cacheKey for the given paramaters.
@@ -236,5 +211,20 @@ class DatabaseStore implements Store
     protected function getCacheKey()
     {
         return md5(get_called_class().implode('', func_get_args()));
+    }
+
+    /**
+     * Clears cache strings for the given locale, group and namesapce.
+     *          
+     * @param  string $locale 
+     * @param  string $group       
+     * @param  string $namespace 
+     * @return array            
+     */
+    public function forget(string $locale, string $group = '*', string $namespace = '*')
+    {
+        $this->cache->forget($this->getCacheKey($locale, $group, $namespace));
+
+        return $this;
     }
 }

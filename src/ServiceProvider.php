@@ -29,7 +29,7 @@ class ServiceProvider extends TranslationServiceProvider
         });
 
         $this->app->singleton(Store::class, function ($app) {
-            return new DatabaseStore($app['db']);
+            return new DatabaseStore($app['db'], $app['cache']);
         });
 
         $this->commands([
